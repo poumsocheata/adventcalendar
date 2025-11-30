@@ -1,0 +1,566 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>A Maker's Advent Calendar</title>
+    
+    <!-- React & ReactDOM -->
+    <script crossorigin src="https://unpkg.com/react@18/umd/react.development.js"></script>
+    <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
+    
+    <!-- Babel -->
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    
+    <!-- Google Fonts -->
+    <link href="https://fonts.googleapis.com/css2?family=Mountains+of+Christmas:wght@400;700&family=Cinzel+Decorative:wght@400;700&family=Dancing+Script:wght@700&display=swap" rel="stylesheet">
+
+    <!-- Firebase SDKs (Compat versions for stability) -->
+    <script src="https://www.gstatic.com/firebasejs/11.0.2/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/11.0.2/firebase-auth-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/11.0.2/firebase-firestore-compat.js"></script>
+
+    <style>
+        body {
+            background-color: #1a1c29;
+            font-family: 'Mountains of Christmas', cursive;
+            overflow-x: hidden;
+        }
+
+        /* Snow Effect */
+        .snowflake {
+            position: fixed;
+            top: -10px;
+            color: #fff;
+            font-size: 1em;
+            user-select: none;
+            z-index: 1000;
+            animation-name: snowfall;
+            animation-timing-function: linear;
+            animation-iteration-count: infinite;
+            opacity: 0.8;
+        }
+
+        @keyframes snowfall {
+            0% { transform: translateY(0) rotate(0deg); }
+            100% { transform: translateY(100vh) rotate(360deg); }
+        }
+
+        /* Scroll Styling */
+        .scroll-container {
+            position: relative;
+            width: 100%;
+            max-width: 500px;
+            margin: 0 auto;
+            perspective: 1000px;
+            animation: unroll 0.6s ease-out forwards;
+            transform-origin: top center;
+        }
+
+        @keyframes unroll {
+            0% { transform: scaleY(0); opacity: 0; }
+            100% { transform: scaleY(1); opacity: 1; }
+        }
+
+        .scroll-paper {
+            background: #f4e4bc;
+            background-image: 
+                linear-gradient(90deg, rgba(0,0,0,0.1) 0%, rgba(255,255,255,0.1) 20%, rgba(255,255,255,0.1) 80%, rgba(0,0,0,0.1) 100%),
+                url("data:image/svg+xml,%3Csvg width='200' height='200' viewBox='0 0 100 100' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.8' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)' opacity='0.08'/%3E%3C/svg%3E");
+            padding: 40px 30px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.5);
+            position: relative;
+            min-height: 300px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+        }
+
+        /* Scroll Rollers */
+        .scroll-top, .scroll-bottom {
+            height: 30px;
+            width: 110%; /* Wider than paper */
+            background: #5d4037;
+            background: linear-gradient(to right, #3e2723, #795548, #3e2723);
+            position: absolute;
+            left: -5%;
+            border-radius: 15px;
+            box-shadow: 0 5px 10px rgba(0,0,0,0.4);
+            z-index: 10;
+        }
+        
+        .scroll-top { top: -15px; }
+        .scroll-bottom { bottom: -15px; }
+
+        .scroll-top::before, .scroll-bottom::before {
+            content: '';
+            position: absolute;
+            left: -10px;
+            top: 50%;
+            transform: translateY(-50%);
+            width: 20px;
+            height: 20px;
+            background: #d4af37; /* Gold knob */
+            border-radius: 50%;
+            box-shadow: inset -2px -2px 5px rgba(0,0,0,0.5);
+        }
+
+        .scroll-top::after, .scroll-bottom::after {
+            content: '';
+            position: absolute;
+            right: -10px;
+            top: 50%;
+            transform: translateY(-50%);
+            width: 20px;
+            height: 20px;
+            background: #d4af37; /* Gold knob */
+            border-radius: 50%;
+            box-shadow: inset -2px -2px 5px rgba(0,0,0,0.5);
+        }
+
+        /* READABLE FONT FOR QUESTS */
+        .quest-text {
+            font-family: 'Georgia', 'Times New Roman', serif;
+            font-size: 1.3rem;
+            color: #1a100a; /* Darker brown for contrast */
+            line-height: 1.6;
+            text-align: center;
+            font-weight: 500;
+            text-shadow: 0 1px 0 rgba(255,255,255,0.4);
+        }
+        
+        /* Door Animation */
+        .door-wrapper {
+            perspective: 1000px;
+        }
+        .door {
+            transition: transform 0.6s;
+            transform-style: preserve-3d;
+            transform-origin: left;
+        }
+        .door-open {
+            transform: rotateY(-110deg);
+        }
+
+        /* Loading Spinner */
+        .spinner {
+            border: 4px solid rgba(255, 255, 255, 0.3);
+            border-radius: 50%;
+            border-top: 4px solid #ffffff;
+            width: 40px;
+            height: 40px;
+            animation: spin 1s linear infinite;
+        }
+        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+
+        .gold-border {
+            border: 2px solid #c5a059;
+            box-shadow: 0 0 10px #c5a059, inset 0 0 10px #c5a059;
+        }
+    </style>
+</head>
+<body>
+    <div id="root"></div>
+
+    <script type="text/babel">
+        const { useState, useEffect, useRef } = React;
+
+        // ---------------------------------------------------------
+        // CONFIGURATION
+        // ---------------------------------------------------------
+        // Only set this to true if you are testing NOT in December
+        const SIMULATE_DECEMBER = false; 
+
+        // ---------------------------------------------------------
+        // ICON COMPONENTS
+        // ---------------------------------------------------------
+        const IconGift = ({ className }) => (
+            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><rect x="3" y="8" width="18" height="4" rx="1"/><path d="M12 8v13"/><path d="M19 12v7a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2v-7"/><path d="M7.5 8a2.5 2.5 0 0 1 0-5A4.8 8 0 0 1 12 8a4.8 8 0 0 1 4.5-5 2.5 2.5 0 0 1 0 5"/></svg>
+        );
+        const IconLock = ({ className }) => (
+            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+        );
+        const IconEdit = ({ className }) => (
+            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><path d="M17 3a2.828 2.828 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5L17 3z"/></svg>
+        );
+        const IconCheck = ({ className, size }) => (
+            <svg xmlns="http://www.w3.org/2000/svg" width={size || 24} height={size || 24} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><polyline points="20 6 9 17 4 12"/></svg>
+        );
+        const IconX = ({ className, size }) => (
+            <svg xmlns="http://www.w3.org/2000/svg" width={size || 24} height={size || 24} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+        );
+        const IconSnowflake = ({ className, size }) => (
+            <svg xmlns="http://www.w3.org/2000/svg" width={size || 24} height={size || 24} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><line x1="2" y1="12" x2="22" y2="12"/><line x1="12" y1="2" x2="12" y2="22"/><path d="M20 16.5L17.5 14"/><path d="M20 7.5L17.5 10"/><path d="M4 16.5L6.5 14"/><path d="M4 7.5L6.5 10"/><path d="M16.5 20L14 17.5"/><path d="M7.5 20L10 17.5"/><path d="M16.5 4L14 6.5"/><path d="M7.5 4L10 6.5"/></svg>
+        );
+
+        // ---------------------------------------------------------
+        // FIREBASE SETUP
+import { initializeApp } from "firebase/app";
+import { getAnalytics } from "firebase/analytics";
+        // ---------------------------------------------------------
+        const firebaseConfig = {
+  	apiKey: "AIzaSyAHpQf-yrR1LxOVneRvxK_j8UO_OSNSxiw",
+ 	authDomain: "advent-cadender.firebaseapp.com",
+  	projectId: "advent-cadender",
+  	storageBucket: "advent-cadender.firebasestorage.app",
+  	messagingSenderId: "225786935390",
+  	appId: "1:225786935390:web:55b15640bb770131579ccf",
+  	measurementId: "G-QYNFGWSJ9R"
+};
+
+	// Initialize Firebase
+	const app = initializeApp(firebaseConfig);
+	const analytics = getAnalytics(app);
+        // ---------------------------------------------------------
+        // SNOW EFFECT COMPONENT
+        // ---------------------------------------------------------
+        const Snowfall = () => {
+            const [flakes, setFlakes] = useState([]);
+            useEffect(() => {
+                const newFlakes = Array.from({ length: 50 }).map((_, i) => ({
+                    id: i,
+                    left: Math.random() * 100 + 'vw',
+                    animationDuration: (Math.random() * 3 + 2) + 's',
+                    animationDelay: Math.random() * 5 + 's',
+                    opacity: Math.random()
+                }));
+                setFlakes(newFlakes);
+            }, []);
+            return (
+                <div className="fixed inset-0 pointer-events-none z-0">
+                    {flakes.map(flake => (
+                        <div key={flake.id} className="snowflake" style={{
+                            left: flake.left, animationDuration: flake.animationDuration,
+                            animationDelay: flake.animationDelay, opacity: flake.opacity
+                        }}>•</div>
+                    ))}
+                </div>
+            );
+        };
+
+        // ---------------------------------------------------------
+        // SCROLL MODAL COMPONENT (View & Edit Quest)
+        // ---------------------------------------------------------
+        const ScrollModal = ({ day, questText, isOpen, onClose, isEditMode, onSave }) => {
+            const [editText, setEditText] = useState(questText || "");
+            
+            useEffect(() => {
+                if (isOpen) {
+                    setEditText(questText || "");
+                }
+            }, [isOpen, questText]);
+
+            if (!isOpen) return null;
+
+            return (
+                <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm" onClick={onClose}>
+                    <div className="scroll-container" onClick={e => e.stopPropagation()}>
+                        <div className="scroll-top"></div>
+                        <div className="scroll-paper">
+                            <h2 className="text-3xl font-bold text-amber-900 mb-6 font-serif">
+                                Day {day} Quest
+                            </h2>
+                            {isEditMode ? (
+                                <div className="w-full flex flex-col items-center gap-4">
+                                    <textarea
+                                        className="w-full h-40 bg-white/50 border-2 border-amber-900/30 rounded p-4 font-serif text-lg text-amber-950 focus:outline-none focus:border-amber-900 resize-none"
+                                        placeholder="Write your quest here..."
+                                        value={editText}
+                                        onChange={(e) => setEditText(e.target.value)}
+                                    />
+                                    <button 
+                                        onClick={() => onSave(day, editText)}
+                                        className="px-6 py-2 bg-green-700 text-white rounded hover:bg-green-800 font-sans shadow-lg transition-transform hover:scale-105 flex items-center gap-2"
+                                    >
+                                        <IconCheck size={18} /> Save Quest
+                                    </button>
+                                </div>
+                            ) : (
+                                <div className="quest-text px-4">
+                                    {questText ? (
+                                        questText.split('\n').map((line, i) => (
+                                            <p key={i} className="mb-2">{line}</p>
+                                        ))
+                                    ) : (
+                                        <p className="text-gray-500 italic text-base">
+                                            The scrolls are silent for this day...
+                                        </p>
+                                    )}
+                                </div>
+                            )}
+                            <div className="mt-8 text-amber-800/60">
+                                <IconSnowflake size={24} className="animate-spin-slow" />
+                            </div>
+                        </div>
+                        <div className="scroll-bottom"></div>
+                        <button 
+                            onClick={onClose}
+                            className="absolute -top-10 right-0 text-white/80 hover:text-white transition-colors"
+                        >
+                            <IconX size={32} />
+                        </button>
+                    </div>
+                </div>
+            );
+        };
+
+        // ---------------------------------------------------------
+        // MAIN APP COMPONENT
+        // ---------------------------------------------------------
+        const App = () => {
+            const [user, setUser] = useState(null);
+            const [quests, setQuests] = useState({});
+            const [selectedDay, setSelectedDay] = useState(null);
+            const [isEditMode, setIsEditMode] = useState(false);
+            const [canEdit, setCanEdit] = useState(false); // Controls visibility of the toggle
+            const [loading, setLoading] = useState(true);
+            const [message, setMessage] = useState(null);
+            const [adminClicks, setAdminClicks] = useState(0);
+
+            // Auth & Admin Check
+            useEffect(() => {
+                const initAuth = async () => {
+                    try {
+                        if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
+                            await auth.signInWithCustomToken(__initial_auth_token);
+                        } else {
+                            await auth.signInAnonymously();
+                        }
+                        
+                        // Check for admin/creator mode in URL
+                        const urlParams = new URLSearchParams(window.location.search);
+                        const adminMode = urlParams.get('mode') === 'creator';
+                        if (adminMode) {
+                            setCanEdit(true);
+                            setIsEditMode(true);
+                            console.log("Welcome, Maker! Edit mode enabled.");
+                        }
+
+                    } catch (error) {
+                        console.error("Auth error:", error);
+                    }
+                };
+                initAuth();
+                const unsubscribe = auth.onAuthStateChanged((u) => setUser(u));
+                return () => unsubscribe();
+            }, []);
+
+            // Data Fetching
+            useEffect(() => {
+                if (!user) return;
+                const questsRef = db.collection('artifacts').doc(appId).collection('public').doc('data').collection('quests');
+                const unsubscribe = questsRef.onSnapshot(
+                    (snapshot) => {
+                        const questsData = {};
+                        snapshot.docs.forEach(doc => {
+                            questsData[doc.id] = doc.data().text;
+                        });
+                        setQuests(questsData);
+                        setLoading(false);
+                    },
+                    (error) => {
+                        console.error("Firestore Error:", error);
+                        setLoading(false);
+                    }
+                );
+                return () => unsubscribe();
+            }, [user]);
+
+            const saveQuest = async (day, text) => {
+                if (!user) return;
+                try {
+                    const questDocRef = db.collection('artifacts').doc(appId).collection('public').doc('data').collection('quests').doc(`day-${day}`);
+                    await questDocRef.set({
+                        text: text,
+                        day: day,
+                        updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+                    });
+                    setSelectedDay(null);
+                } catch (err) {
+                    console.error("Error saving quest:", err);
+                }
+            };
+
+            const handleDayClick = (day) => {
+                if (isEditMode) {
+                    setSelectedDay(day);
+                    return;
+                }
+
+                const today = new Date();
+                const currentMonth = today.getMonth(); // 11 is December
+                const currentDate = today.getDate();
+                
+                // Allow during December OR if simulation is on
+                const isDecember = currentMonth === 11 || SIMULATE_DECEMBER;
+
+                if (!isDecember) {
+                    showMessage("It's not time for the Advent Calendar yet!");
+                    return;
+                }
+
+                if (day > currentDate) {
+                    showMessage(`Patience! Do not open Day ${day} until December ${day}.`);
+                    return;
+                }
+
+                // If day <= currentDate, it opens (even if it's a past day)
+                setSelectedDay(day);
+            };
+
+            const handleSecretTrigger = () => {
+                const newCount = adminClicks + 1;
+                setAdminClicks(newCount);
+                if (newCount === 5) {
+                    setCanEdit(true);
+                    setIsEditMode(true);
+                    showMessage("Creator Mode Unlocked!");
+                }
+            };
+
+            const showMessage = (msg) => {
+                setMessage(msg);
+                setTimeout(() => setMessage(null), 3000);
+            };
+
+            const getDayState = (day) => {
+                if (isEditMode) return 'edit';
+                
+                const today = new Date();
+                const currentMonth = today.getMonth();
+                const currentDate = today.getDate();
+                const isDecember = currentMonth === 11 || SIMULATE_DECEMBER;
+
+                if (!isDecember) return 'locked';
+                if (day > currentDate) return 'locked';
+                if (day === currentDate) return 'today';
+                return 'open'; // Past days are also 'open'
+            };
+
+            if (loading) {
+                return (
+                    <div className="min-h-screen flex flex-col items-center justify-center text-white gap-4">
+                        <div className="spinner"></div>
+                        <p className="font-serif text-xl">Summoning the holiday spirit...</p>
+                    </div>
+                );
+            }
+
+            return (
+                <div className="min-h-screen pb-12 relative z-10">
+                    <Snowfall />
+
+                    {/* Toast Message */}
+                    {message && (
+                        <div className="fixed top-20 left-1/2 transform -translate-x-1/2 z-50 bg-red-900/90 text-white px-6 py-3 rounded-full shadow-xl border border-red-500 backdrop-blur animate-bounce">
+                            {message}
+                        </div>
+                    )}
+
+                    {/* Header */}
+                    <header className="p-6 text-center text-white relative">
+                        {/* Only show edit toggle if admin param is present OR secret triggered */}
+                        {canEdit && (
+                            <div className="absolute top-6 right-6 flex items-center gap-3 bg-black/40 p-2 rounded-full backdrop-blur-sm border border-white/10 z-20">
+                                <span className={`text-sm ${isEditMode ? 'text-green-400 font-bold' : 'text-gray-300'}`}>
+                                    {isEditMode ? 'Creator Mode' : 'Player Mode'}
+                                </span>
+                                <button 
+                                    onClick={() => setIsEditMode(!isEditMode)}
+                                    className={`w-12 h-6 rounded-full transition-colors relative ${isEditMode ? 'bg-green-600' : 'bg-gray-600'}`}
+                                >
+                                    <div className={`absolute top-1 w-4 h-4 bg-white rounded-full transition-all ${isEditMode ? 'left-7' : 'left-1'}`}></div>
+                                </button>
+                            </div>
+                        )}
+
+                        <h1 className="text-5xl md:text-7xl font-bold mb-2 text-transparent bg-clip-text bg-gradient-to-r from-yellow-200 via-yellow-400 to-yellow-200" style={{ fontFamily: 'Mountains of Christmas' }}>
+                            A Maker's Advent Calendar
+                        </h1>
+                        <p className="text-lg text-blue-100 max-w-2xl mx-auto opacity-80">
+                            Unlock a new challenge every day until Christmas.
+                        </p>
+                    </header>
+
+                    {/* Grid */}
+                    <main className="container mx-auto px-4 max-w-5xl">
+                        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-4 md:gap-6">
+                            {Array.from({ length: 24 }, (_, i) => i + 1).map((day) => {
+                                const status = getDayState(day);
+                                const hasQuest = quests[`day-${day}`];
+                                
+                                return (
+                                    <div 
+                                        key={day}
+                                        onClick={() => handleDayClick(day)}
+                                        className={`
+                                            relative aspect-square rounded-xl cursor-pointer transition-all duration-300 transform hover:-translate-y-1 door-wrapper
+                                            ${status === 'locked' ? 'opacity-90 hover:opacity-100' : ''}
+                                        `}
+                                    >
+                                        <div className={`
+                                            absolute inset-0 rounded-xl shadow-2xl flex flex-col items-center justify-center border-2
+                                            ${status === 'locked' 
+                                                ? 'bg-red-900 border-red-950 text-red-200 grayscale-[0.3]' 
+                                                : status === 'today'
+                                                    ? 'bg-green-800 border-yellow-400 text-yellow-100 gold-border'
+                                                    : 'bg-green-900 border-green-950 text-green-100'
+                                            }
+                                        `}>
+                                            <span className="text-4xl md:text-5xl font-bold drop-shadow-lg">{day}</span>
+                                            
+                                            <div className="mt-2">
+                                                {status === 'locked' ? (
+                                                    <IconLock className="opacity-50" />
+                                                ) : isEditMode ? (
+                                                    <div className="flex gap-1 items-center bg-black/30 px-2 py-1 rounded text-xs">
+                                                        <IconEdit className="w-3 h-3" />
+                                                        {hasQuest ? 'Edit' : 'Add'}
+                                                    </div>
+                                                ) : (
+                                                    <IconGift className="animate-bounce" />
+                                                )}
+                                            </div>
+
+                                            {/* Decorative Corners */}
+                                            <div className="absolute top-2 left-2 w-2 h-2 border-t-2 border-l-2 border-current opacity-30"></div>
+                                            <div className="absolute top-2 right-2 w-2 h-2 border-t-2 border-r-2 border-current opacity-30"></div>
+                                            <div className="absolute bottom-2 left-2 w-2 h-2 border-b-2 border-l-2 border-current opacity-30"></div>
+                                            <div className="absolute bottom-2 right-2 w-2 h-2 border-b-2 border-r-2 border-current opacity-30"></div>
+                                        </div>
+                                    </div>
+                                );
+                            })}
+                        </div>
+                    </main>
+
+                    <ScrollModal 
+                        day={selectedDay}
+                        questText={quests[`day-${selectedDay}`]}
+                        isOpen={!!selectedDay}
+                        onClose={() => setSelectedDay(null)}
+                        isEditMode={isEditMode}
+                        onSave={saveQuest}
+                    />
+
+                    <footer className="mt-16 text-center text-gray-500 text-sm pb-8">
+                        <p 
+                            onClick={handleSecretTrigger} 
+                            className="cursor-pointer select-none hover:text-white transition-colors inline-block"
+                        >
+                            Built for the holidays.
+                        </p>
+                    </footer>
+                </div>
+            );
+        };
+
+        const root = ReactDOM.createRoot(document.getElementById('root'));
+        root.render(<App />);
+    </script>
+</body>
+</html>
